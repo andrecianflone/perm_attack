@@ -1,2 +1,10 @@
 tags
 *.swp
+saved_models/
+*.pt
+settings.json
+experiments/
+results/
+data/
+.data/
+.vector_cache
