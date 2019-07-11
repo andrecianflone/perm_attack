@@ -1,8 +1,15 @@
-cd ..
-mkdir -p .vector_cache && cd .vector_cache
+#!/bin/bash
+
+# Prep dir
+# $1 is something like .vector_cache/
+# Clean dir
+rm -rf $1
+mkdir -p $1 && cd $1
+
+echo "Downloading Glove, trained on 6B tokens Wiki + Gigaword"
+mkdir temp && cd temp
 wget http://nlp.stanford.edu/data/wordvecs/glove.6B.zip
 unzip glove.6B.zip
-rm glove.6B.zip
-rm glove.6B.100d.txt
-rm glove.6B.200d.txt
-rm glove.6B.50d.txt
+mv glove.6B.300d.txt ../
+cd ../
+rm -rf temp/
