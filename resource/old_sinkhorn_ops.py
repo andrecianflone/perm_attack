@@ -144,16 +144,14 @@ def my_gumbel_sinkhorn(log_alpha, temp=1.0, n_samples=1, noise_factor=1.0, n_ite
         log_alpha_w_noise = torch.transpose(log_alpha_w_noise, 1, 0)
     return sink, log_alpha_w_noise
 
-def my_sample_uniform_and_order(n_lists, n_numbers, prob_inc):
+def my_sample_uniform_and_order(n_lists, n_numbers):
     """
-    Samples uniform random numbers, return sorted lists and the indices of their original values
-
+    Samples uniform random numbers, return sorted lists and the indices of
+    their original values
 
     Args:
     n_lists: An int,the number of lists to be sorted.
     n_numbers: An int, the number of elements in the permutation.
-    prob_inc: A float, the probability that a list of numbers will be sorted in
-    increasing order.
 
     Returns:
     ordered: a 2-D float tensor with shape = [n_list, n_numbers] of sorted lists
@@ -164,11 +162,6 @@ def my_sample_uniform_and_order(n_lists, n_numbers, prob_inc):
      satisfies ordered[i, permutations[i]) = random[i,:].
 
     """
-    # sample n_lists samples from Bernoulli with probability of prob_inc
-    # my_bern = torch.distributions.Bernoulli(torch.tensor([prob_inc])).sample([n_lists])
-
-    # sign = -1*((my_bern * 2) -torch.ones([n_lists,1]))
-    # sign = sign.type(torch.float32)
     random =(torch.empty(n_lists, n_numbers).uniform_(0, 1))
     random =random.type(torch.float32)
 

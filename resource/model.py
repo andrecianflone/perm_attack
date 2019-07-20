@@ -3,7 +3,7 @@
 
 import torch
 import torch.nn as nn
-import sinkhorn_ops
+import sinkhorn
 
 class Sinkhorn_Net(nn.Module):
 
@@ -49,7 +49,7 @@ class Sinkhorn_Net(nn.Module):
 
         #apply the gumbel sinkhorn on log alpha
         soft_perms, log_alpha_w_noise = \
-                sinkhorn_ops.my_gumbel_sinkhorn(x, self.temp,
+                sinkhorn.my_gumbel_sinkhorn(x, self.temp,
                 self.samples_per_num, self.noise_factor, self.n_iter_sinkhorn,
                 squeeze=False)
 

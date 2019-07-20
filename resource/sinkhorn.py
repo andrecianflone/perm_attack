@@ -1,4 +1,5 @@
-"""My torch implementation of permutations and sinkhorn balancing ops.
+"""
+My torch implementation of permutations and sinkhorn balancing ops.
 
 A torch library of operations and sampling with permutations
 and their approximation with doubly-stochastic matrices, through Sinkhorn balancing
@@ -12,21 +13,20 @@ import torch
 #from torch.distributions import Bernoulli
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-def my_sample_gumbel(shape, eps=1e-20):
-    """Samples arbitrary-shaped standard gumbel variables.
-    Args:
-    shape: list of integers
-    eps: float, for numerical stability
 
-    Returns:
-    A sample of standard Gumbel random variables
+def sample_gumbel(shape, eps=1e-20):
+    """Return samples from arbitrary-shaped standard Gumbel(0,1)
+    Args:
+        shape: list of integers
+        eps: float, for numerical stability
     """
-    #Sample from Gumbel(0, 1)
     U = torch.rand(shape).float()
     return -torch.log(eps - torch.log(U + eps))
 
 def simple_sinkhorn(MatrixA, n_iter = 20):
-    #performing simple Sinkhorn iterations.
+    """
+    The original Sinkhorn iteration
+    """
 
     for i in range(n_iter):
         MatrixA /= MatrixA.sum(dim=1, keepdim=True)
@@ -34,26 +34,15 @@ def simple_sinkhorn(MatrixA, n_iter = 20):
     return MatrixA
 
 def my_sinkhorn(log_alpha, n_iters = 20):
-    # torch version
     """Performs incomplete Sinkhorn normalization to log_alpha.
 
-    By a theorem by Sinkhorn and Knopp [1], a sufficiently well-behaved  matrix
-    with positive entries can be turned into a doubly-stochastic matrix
-    (i.e. its rows and columns add up to one) via the successive row and column
-    normalization.
-    -To ensure positivity, the effective input to sinkhorn has to be
-    exp(log_alpha) (element wise).
-    -However, for stability, sinkhorn works in the log-space. It is only at
-    return time that entries are exponentiated.
-
-    [1] Sinkhorn, Richard and Knopp, Paul.
-    Concerning nonnegative matrices and doubly stochastic
-    matrices. Pacific Journal of Mathematics, 1967
+    To ensure positivity, apply exp(log_alpha) to input. However, for
+    stability, sinkhorn works in the log-space. It is only at return time that
+    entries are exponentiated.
 
     Args:
-    log_alpha: a 2D tensor of shape [N, N]
-    n_iters: number of sinkhorn iterations (in practice, as little as 20
-      iterations are needed to achieve decent convergence for N~100)
+    log_alpha: (tensor) shape [N, N]
+    n_iters: (int) sinkhorn iterations
 
     Returns:
     A 3D tensor of close-to-doubly-stochastic matrices (2D tensors are
@@ -63,10 +52,6 @@ def my_sinkhorn(log_alpha, n_iters = 20):
     log_alpha = log_alpha.view(-1, n, n)
 
     for i in range(n_iters):
-        # torch.logsumexp(input, dim, keepdim, out=None)
-        #Returns the log of summed exponentials of each row of the input tensor in the given dimension dim
-        #log_alpha -= (torch.logsumexp(log_alpha, dim=2, keepdim=True)).view(-1, n, 1)
-        #log_alpha -= (torch.logsumexp(log_alpha, dim=1, keepdim=True)).view(-1, 1, n)
         #avoid in-place
         log_alpha = log_alpha - (torch.logsumexp(log_alpha, dim=2, keepdim=True)).view(-1, n, 1)
         log_alpha = log_alpha - (torch.logsumexp(log_alpha, dim=1, keepdim=True)).view(-1, 1, n)
@@ -128,7 +113,7 @@ def my_gumbel_sinkhorn(log_alpha, temp=1.0, n_samples=1, noise_factor=1.0, n_ite
     if noise_factor == 0:
         noise = 0.0
     else:
-        noise = my_sample_gumbel([n_samples*batch_size, n, n])*noise_factor
+        noise = sample_gumbel([n_samples*batch_size, n, n])*noise_factor
         noise = noise.to(device)
 
     log_alpha_w_noise = log_alpha_w_noise + noise
@@ -144,60 +129,20 @@ def my_gumbel_sinkhorn(log_alpha, temp=1.0, n_samples=1, noise_factor=1.0, n_ite
         log_alpha_w_noise = torch.transpose(log_alpha_w_noise, 1, 0)
     return sink, log_alpha_w_noise
 
-def my_sample_uniform_and_order(n_lists, n_numbers, prob_inc):
-    """
-    Samples uniform random numbers, return sorted lists and the indices of their original values
-
+def sample_uniform_and_order(n_lists, n_numbers):
+    """ Samples lists of uniform U(0,1)
+    Returns ordered lists, random lists, permutations
 
     Args:
-    n_lists: An int,the number of lists to be sorted.
-    n_numbers: An int, the number of elements in the permutation.
-    prob_inc: A float, the probability that a list of numbers will be sorted in
-    increasing order.
-
-    Returns:
-    ordered: a 2-D float tensor with shape = [n_list, n_numbers] of sorted lists
-     of numbers.
-    random: a 2-D float tensor with shape = [n_list, n_numbers] of uniform random
-     numbers.
-    permutations: a 2-D int tensor with shape = [n_list, n_numbers], row i
-     satisfies ordered[i, permutations[i]) = random[i,:].
-
+        n_lists: (int) number of lists
+        n_numbers: (int) list size
     """
-    # sample n_lists samples from Bernoulli with probability of prob_inc
-    # my_bern = torch.distributions.Bernoulli(torch.tensor([prob_inc])).sample([n_lists])
-
-    # sign = -1*((my_bern * 2) -torch.ones([n_lists,1]))
-    # sign = sign.type(torch.float32)
     random =(torch.empty(n_lists, n_numbers).uniform_(0, 1))
     random =random.type(torch.float32)
 
     ordered, permutations = torch.sort(random, descending=True)
     return ordered, random, permutations
 
-def my_sample_permutations(n_permutations, n_objects):
-    """Samples a batch permutations from the uniform distribution.
-
-    Returns a sample of n_permutations permutations of n_objects indices.
-    Permutations are assumed to be represented as lists of integers
-    (see 'listperm2matperm' and 'matperm2listperm' for conversion to alternative
-    matricial representation). It does so by sampling from a continuous
-    distribution and then ranking the elements. By symmetry, the resulting
-    distribution over permutations must be uniform.
-
-    Args:
-    n_permutations: An int, the number of permutations to sample.
-    n_objects: An int, the number of elements in the permutation.
-      the embedding sources.
-
-    Returns:
-    A 2D integer tensor with shape [n_permutations, n_objects], where each
-      row is a permutation of range(n_objects)
-
-    """
-    random_pre_perm = torch.empty(n_permutations, n_objects).uniform_(0, 1)
-    _, permutations = torch.topk(random_pre_perm, k = n_objects)
-    return permutations
 
 def my_permute_batch_split(batch_split, permutations):
     """Scrambles a batch of objects according to permutations.

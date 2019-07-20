@@ -1,10 +1,9 @@
 
 import os
 import torch
-import my_sorting_model
 import numpy
 import torch.nn as nn
-import sinkhorn_ops
+import sinkhorn
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import model
@@ -17,7 +16,6 @@ n_numbers = 50
 lr = 0.1
 temperature = 1.0
 batch_size = 10
-prob_inc = 1.0
 # samples_per_num = 5
 samples_per_num = 1
 n_iter_sinkhorn = 10
@@ -28,13 +26,14 @@ num_iters = 500
 n_epochs = 301
 
 # Training process
-def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_epochs=500):
+def train_model(model, criterion, optimizer, batch_size, n_numbers, n_epochs):
     # Get data
-    train_ordered, train_random, train_hard_perms = sinkhorn_ops.my_sample_uniform_and_order(batch_size, n_numbers, prob_inc)
+    train_ordered, train_random, train_hard_perms =\
+                    sinkhorn.sample_uniform_and_order(batch_size, n_numbers)
 
     x = train_random.to(device).detach()
     perms = train_hard_perms.to(device).detach()
-    y_in = train_ordered.to(device).detach()
+    y = train_ordered.to(device).detach()
 
     loss_history = []
     epoch_history = []
@@ -57,7 +56,8 @@ def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_
 
         # Update the progress bar.
         if epoch % 50 == 0:
-            print("Epoch {0:03d}: l2 loss={1:.4f}".format(epoch, loss_history[-1]))
+            print("Epoch {0:03d}: l2 loss={1:.4f}".format(epoch,
+                                                            loss_history[-1]))
     #save the model for evaluation
     torch.save(model.state_dict(), os.path.join(dir_path, 'trained_model'))
     print('Training completed')
@@ -82,7 +82,7 @@ criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr, eps=1e-8)
 
 # Train
-loss_history, epoch_history = train_model(model, criterion, optimizer, batch_size, n_numbers, 1-prob_inc, n_epochs=n_epochs)
+loss_history, epoch_history = train_model(model, criterion, optimizer, batch_size, n_numbers, n_epochs=n_epochs)
 
 # Plot
 plt.plot(epoch_history, loss_history)
