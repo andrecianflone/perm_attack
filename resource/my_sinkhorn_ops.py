@@ -11,6 +11,7 @@ from scipy.stats import kendalltau
 import torch
 #from torch.distributions import Bernoulli
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def my_sample_gumbel(shape, eps=1e-20):
     """Samples arbitrary-shaped standard gumbel variables.
     Args:
@@ -128,6 +129,7 @@ def my_gumbel_sinkhorn(log_alpha, temp=1.0, n_samples=1, noise_factor=1.0, n_ite
         noise = 0.0
     else:
         noise = my_sample_gumbel([n_samples*batch_size, n, n])*noise_factor
+        noise = noise.to(device)
 
     log_alpha_w_noise = log_alpha_w_noise + noise
     log_alpha_w_noise = log_alpha_w_noise / temp

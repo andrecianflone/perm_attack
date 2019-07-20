@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import os
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 #parameters
 n_numbers = 50
@@ -34,8 +35,8 @@ def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_
     train_ordered_tiled = train_ordered.repeat(samples_per_num, 1)
     train_random_tiled = train_random.repeat(samples_per_num, 1)
 
-    train_ordered_tiled = train_ordered_tiled.view(-1, n_numbers, 1)
-    train_random_tiled = train_random_tiled.view(-1, n_numbers, 1)
+    train_ordered_tiled = train_ordered_tiled.view(-1, n_numbers, 1).to(device)
+    train_random_tiled = train_random_tiled.view(-1, n_numbers, 1).to(device)
 
     loss_history = []
     epoch_history = []
@@ -72,7 +73,8 @@ def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_
         loss_history.append(loss.item())
 
         # Update the progress bar.
-        print("Epoch {0:03d}: l2 loss={1:.4f}".format(epoch + 1, loss_history[-1]))
+        if epoch % 50 == 0:
+            print("Epoch {0:03d}: l2 loss={1:.4f}".format(epoch + 1, loss_history[-1]))
     #save the model for evaluation
     torch.save(model.state_dict(), os.path.join(dir_path, 'trained_model'))
     print('Training completed')
