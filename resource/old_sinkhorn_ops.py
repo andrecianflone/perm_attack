@@ -145,18 +145,9 @@ def my_gumbel_sinkhorn(log_alpha, temp=1.0, n_samples=1, noise_factor=1.0, n_ite
     return sink, log_alpha_w_noise
 
 def my_sample_uniform_and_order(n_lists, n_numbers, prob_inc):
-    """Samples uniform random numbers, return sorted lists and the indices of their original values
+    """
+    Samples uniform random numbers, return sorted lists and the indices of their original values
 
-    Returns a 2-D tensor of n_lists lists of n_numbers sorted numbers in the [0,1]
-    interval, each of them having n_numbers elements.
-    Lists are increasing with probability prob_inc.
-    It does so by first sampling uniform random numbers, and then sorting them.
-    Therefore, sorted numbers follow the distribution of the order statistics of
-    a uniform distribution.
-    It also returns the random numbers and the lists of permutations p such
-    p(sorted) = random.
-    Notice that if one ones to build sorted numbers in different intervals, one
-    might just want to re-scaled this canonical form.
 
     Args:
     n_lists: An int,the number of lists to be sorted.
@@ -174,23 +165,14 @@ def my_sample_uniform_and_order(n_lists, n_numbers, prob_inc):
 
     """
     # sample n_lists samples from Bernoulli with probability of prob_inc
-    my_bern = torch.distributions.Bernoulli(torch.tensor([prob_inc])).sample([n_lists])
+    # my_bern = torch.distributions.Bernoulli(torch.tensor([prob_inc])).sample([n_lists])
 
-    sign = -1*((my_bern * 2) -torch.ones([n_lists,1]))
-    sign = sign.type(torch.float32)
+    # sign = -1*((my_bern * 2) -torch.ones([n_lists,1]))
+    # sign = sign.type(torch.float32)
     random =(torch.empty(n_lists, n_numbers).uniform_(0, 1))
     random =random.type(torch.float32)
 
-    # my change
-    #random_with_sign = random * sign
-    #Finds sorted values and indices of the k largest entries for the last dimension.
-    #sorted – controls whether to return the elements in sorted order
-
-    #ordered, permutations = torch.topk(random_with_sign, k = n_numbers, sorted = True)
-    # my change
     ordered, permutations = torch.sort(random, descending=True)
-    #my change
-    #ordered = ordered * sign
     return ordered, random, permutations
 
 def my_sample_permutations(n_permutations, n_objects):
