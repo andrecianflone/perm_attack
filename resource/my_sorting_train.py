@@ -4,7 +4,7 @@ import torch
 import my_sorting_model
 import numpy
 import torch.nn as nn
-import my_sinkhorn_ops
+import sinkhorn_ops
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import model
@@ -31,7 +31,7 @@ n_epochs = 301
 # Training process
 def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_epochs=500):
     #train variables
-    train_ordered, train_random, train_hard_perms = my_sinkhorn_ops.my_sample_uniform_and_order(batch_size, n_numbers, prob_inc)
+    train_ordered, train_random, train_hard_perms = sinkhorn_ops.my_sample_uniform_and_order(batch_size, n_numbers, prob_inc)
     # tiled variables, to compare to many permutations
     train_ordered_tiled = train_ordered.repeat(samples_per_num, 1)
     train_random_tiled = train_random.repeat(samples_per_num, 1)
@@ -56,7 +56,7 @@ def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_
         #obtain log alpha
         # log_alpha = model(x_in)
         #apply the gumbel sinkhorn on log alpha
-        # soft_perms_inf, log_alpha_w_noise = my_sinkhorn_ops.my_gumbel_sinkhorn(log_alpha, temperature, samples_per_num, noise_factor,  n_iter_sinkhorn, squeeze=False)
+        # soft_perms_inf, log_alpha_w_noise = sinkhorn_ops.my_gumbel_sinkhorn(log_alpha, temperature, samples_per_num, noise_factor,  n_iter_sinkhorn, squeeze=False)
         # inv_soft_perms_flat = inv_soft_pers_flattened(soft_perms_inf)
 
         soft_perms_inf = model(x_in)
@@ -104,7 +104,7 @@ def build_l2s_loss(ordered_tiled, random_tiled, soft_perms_inf, n_numbers):
 
     print("l2s_diff", l2s_diff)
 
-ordered, random, hard_perms = my_sinkhorn_ops.my_sample_uniform_and_order(batch_size, n_numbers, prob_inc)
+ordered, random, hard_perms = sinkhorn_ops.my_sample_uniform_and_order(batch_size, n_numbers, prob_inc)
 # tiled variables, to compare to many permutations
 ordered_tiled = ordered.repeat(samples_per_num, 1)
 random_tiled = random.repeat(samples_per_num, 1)

@@ -3,7 +3,7 @@
 
 import torch
 import torch.nn as nn
-import my_sinkhorn_ops
+import sinkhorn_ops
 
 class Sinkhorn_Net(nn.Module):
 
@@ -46,6 +46,7 @@ class Sinkhorn_Net(nn.Module):
                 squeeze=False)
 
         x = inv_soft_pers_flattened(soft_perms_inf, n_numbers)
+
         return x
 
 def inv_soft_pers_flattened(soft_perms_inf, n_numbers):
