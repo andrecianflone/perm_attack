@@ -1,4 +1,5 @@
 
+import os
 import torch
 import my_sorting_model
 import numpy
@@ -6,7 +7,7 @@ import torch.nn as nn
 import my_sinkhorn_ops
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
-import os
+import model
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -25,7 +26,7 @@ optimizer = 'adam'
 keep_prob = 1.
 num_iters = 500
 
-n_epochs = 300
+n_epochs = 301
 
 # Training process
 def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_epochs=500):
@@ -46,26 +47,21 @@ def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_
         # Training phase
         model.train()
 
-        x_in, perms = train_random, train_hard_perms
-        y_in = train_ordered
+        x_in = train_random.to(device).detach()
+        perms = train_hard_perms.to(device).detach()
+        y_in = train_ordered.to(device).detach()
+        train_ordered_tiled = train_ordered_tiled.to(device).detach()
 
-        if is_cuda_available:
-            x_in, y_in = Variable(x_in.cuda()).detach(), Variable(y_in.cuda()).detach()
-            train_ordered_tiled = Variable(train_ordered_tiled.cuda()).detach()
-            perms = Variable(perms.cuda()).detach()
-        else:
-            x_in, y_in = Variable(x_in).detach(), Variable(y_in).detach()
-            train_ordered_tiled = Variable(train_ordered_tiled).detach()
-            perms = Variable(perms).detach()
         optimizer.zero_grad()
         #obtain log alpha
-        log_alpha = model(x_in)
+        # log_alpha = model(x_in)
         #apply the gumbel sinkhorn on log alpha
-        soft_perms_inf, log_alpha_w_noise = my_sinkhorn_ops.my_gumbel_sinkhorn(log_alpha, temperature, samples_per_num, noise_factor,  n_iter_sinkhorn, squeeze=False)
+        # soft_perms_inf, log_alpha_w_noise = my_sinkhorn_ops.my_gumbel_sinkhorn(log_alpha, temperature, samples_per_num, noise_factor,  n_iter_sinkhorn, squeeze=False)
+        # inv_soft_perms_flat = inv_soft_pers_flattened(soft_perms_inf)
 
-        inv_soft_perms_flat = inv_soft_pers_flattened(soft_perms_inf)
+        soft_perms_inf = model(x_in)
 
-        loss= criterion(train_ordered_tiled, torch.matmul(inv_soft_perms_flat, train_random_tiled))
+        loss= criterion(train_ordered_tiled, torch.matmul(soft_perms_inf, train_random_tiled))
 
         loss.backward()
         optimizer.step()
@@ -74,7 +70,7 @@ def train_model(model, criterion, optimizer, batch_size, n_numbers, prob_inc, n_
 
         # Update the progress bar.
         if epoch % 50 == 0:
-            print("Epoch {0:03d}: l2 loss={1:.4f}".format(epoch + 1, loss_history[-1]))
+            print("Epoch {0:03d}: l2 loss={1:.4f}".format(epoch, loss_history[-1]))
     #save the model for evaluation
     torch.save(model.state_dict(), os.path.join(dir_path, 'trained_model'))
     print('Training completed')
@@ -115,10 +111,8 @@ random_tiled = random.repeat(samples_per_num, 1)
 
 # Create the neural network
 dropout_prob = 1. - keep_prob
-model = my_sorting_model.Sinkhorn_Net(latent_dim= n_units, output_dim= n_numbers, dropout_prob = dropout_prob)
-is_cuda_available = torch.cuda.is_available();
-if is_cuda_available:
-    model.cuda()
+# model = my_sorting_model.Sinkhorn_Net(latent_dim= n_units, output_dim= n_numbers, dropout_prob = dropout_prob)
+model = model.Sinkhorn_Net(latent_dim= n_units, output_dim= n_numbers, dropout_prob = dropout_prob).to(device)
 
 n_params = 0
 for p in model.parameters():
