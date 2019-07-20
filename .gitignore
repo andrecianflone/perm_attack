@@ -8,3 +8,6 @@ results/
 data/
 .data/
 .vector_cache
+__pycache__/
+trained_model
+*.png
