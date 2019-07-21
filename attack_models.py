@@ -11,6 +11,7 @@ import json
 import os
 import numpy as np
 import ipdb
+import perm_model
 
 class Seq2SeqCAE(nn.Module):
     # CNN encoder, LSTM decoder
@@ -221,8 +222,9 @@ class Seq2SeqCAE(nn.Module):
         return decoded
 
 class Seq2Seq(nn.Module):
-    def __init__(self, glove_weights, train_emb,emsize, nhidden, ntokens, nlayers, noise_radius=0.2,
-                 hidden_init=True, dropout=0, deterministic=False,gpu=True):
+    def __init__(self, glove_weights, train_emb,emsize, nhidden, ntokens,
+            nlayers, noise_radius=0.2, hidden_init=True, dropout=0,
+            deterministic=False, gpu=True):
         super(Seq2Seq, self).__init__()
         self.nhidden = nhidden
         self.emsize = emsize
@@ -312,10 +314,11 @@ class Seq2Seq(nn.Module):
         batch_size, maxlen = indices.size()
 
         # below: last hidden state, KL, input embeddings
-        hidden, KL, embeddings = self.encode(indices, lengths, noise)
+        packed_output, hidden, KL, embeddings = \
+                                        self.encode(indices, lengths, noise)
 
         if encode_only:
-            return hidden
+            return packed_output, hidden, embeddings
 
         if hidden.requires_grad:
             hidden.register_hook(self.store_grad_norm)
@@ -370,10 +373,11 @@ class Seq2Seq(nn.Module):
         self.encoder.flatten_parameters()
         packed_output, state = self.encoder(packed_embeddings)
 
-        hidden, cell = state
+        hiddens, cell = state
         # batch_size x nhidden
-        hidden = hidden[-1]  # get hidden state of last layer of encoder
+        hidden = hiddens[-1]  # get hidden state of last layer of encoder
 
+        # TODO: normalize all hidden states?
         # normalize to unit ball (l2 norm of 1) - p=2, dim=1
         norms = torch.norm(hidden, 2, 1)
         if norms.ndimension()==1:
@@ -401,7 +405,7 @@ class Seq2Seq(nn.Module):
             # hidden = hidden + to_gpu(self.gpu, Variable(gauss_noise))
 
         # Also return original embeddings
-        return hidden, kl_div, embeddings
+        return packed_output, hidden, kl_div, embeddings
 
     def decode(self, hidden, batch_size, maxlen, indices=None, lengths=None):
         """
@@ -485,6 +489,45 @@ class Seq2Seq(nn.Module):
         # ipdb.set_trace()
         return max_indices, fake_logits
 
+class PermSeq2Seq(Seq2Seq):
+    def __init__(self, glove_weights, train_emb,emsize, nhidden, ntokens,
+            nlayers, noise_radius=0.2, hidden_init=True, dropout=0,
+            deterministic=False, gpu=True):
+
+        super().__init__(glove_weights, train_emb,emsize, nhidden, ntokens,
+            nlayers, noise_radius=0.2, hidden_init=True, dropout=0,
+            deterministic=True, gpu=True)
+
+        self.l1 = nn.Linear(nhidden, 1)
+        self.nhidden = nhidden
+        self.sink_net = perm_model.Sinkhorn_Net(\
+                latent_dim=128,
+                output_dim=200)
+
+    def forward(self, indices, lengths=None, noise=True, encode_only=False,
+            generator=None, inverter=None, project_to_emb=True):
+
+        # Get all encoder hidden states
+        packed_output, hidden, embeddings = super().forward(indices,
+                lengths=None, noise=True, encode_only=True,generator=None,
+                inverter=None, project_to_emb=True)
+
+        # Unpack rnn states
+        outputs, output_lengths = \
+                        torch.nn.utils.rnn.pad_packed_sequence(packed_output)
+        # Swap dims
+        out = outputs.permute(1,0,2)
+        seq_len = out.size(1)
+        # Flatten
+        out = out.contiguous().view(-1, self.nhidden)
+        # Last dim of hidden is projected to size [1] to form the perm matrix
+        out = self.l1(out)
+        out = out.view(-1, seq_len)
+        # Pass through Sinkhorn net
+        permutations = self.sink_net(out, permutation_only=True)
+        # Apply permutations to original embedding input
+        out = torch.matmul(permutations, embeddings.detach())
+        return out
 
 def load_models(load_path):
     model_args = json.load(open("{}/args.json".format(load_path), "r"))
